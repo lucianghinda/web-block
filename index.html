@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>120 Seconds Clock</title>
+  <!-- Use the correct Stimulus JS CDN link -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/stimulus/2.0.0/stimulus.umd.min.js"></script>
+  <!-- Load Tailwind CSS properly -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+  <style>
+    .progress-ring {
+      transition: stroke-dashoffset 1s linear;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 h-screen flex items-center justify-center">
+  <div data-controller="countdown" class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+    <div class="text-center mb-6">
+      <h1 class="text-3xl font-bold text-gray-800">120 Seconds Clock</h1>
+      <p class="text-gray-600 mt-2">Watch the seconds pass by</p>
+    </div>
+
+    <div class="flex justify-center mb-6">
+      <div class="relative w-48 h-48">
+        <!-- Clock face -->
+        <div class="absolute inset-0 rounded-full border-8 border-gray-200"></div>
+        
+        <!-- Progress ring -->
+        <svg class="absolute inset-0 transform -rotate-90" viewBox="0 0 100 100">
+          <circle 
+            data-countdown-target="progressRing"
+            cx="50" cy="50" r="45" 
+            fill="transparent" 
+            stroke="#4F46E5" 
+            stroke-width="8" 
+            stroke-dasharray="283" 
+            stroke-dashoffset="283"
+            class="progress-ring">
+          </circle>
+        </svg>
+        
+        <!-- Digital time display -->
+        <div class="absolute inset-0 flex items-center justify-center">
+          <div class="text-center">
+            <span data-countdown-target="timeDisplay" class="text-4xl font-bold text-gray-800">02:00</span>
+            <p data-countdown-target="secondsLeft" class="text-sm text-gray-600 mt-1">120 seconds left</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex justify-center space-x-4">
+      <button 
+        data-action="click->countdown#start"
+        data-countdown-target="startButton"
+        class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-6 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        Start
+      </button>
+      <button 
+        data-action="click->countdown#pause"
+        data-countdown-target="pauseButton"
+        class="bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-2 px-6 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 opacity-50"
+        disabled>
+        Pause
+      </button>
+      <button 
+        data-action="click->countdown#reset"
+        data-countdown-target="resetButton"
+        class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-6 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 opacity-50"
+        disabled>
+        Reset
+      </button>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      // Wait for DOM to be fully loaded
+      document.addEventListener('DOMContentLoaded', () => {
+        // Check if Stimulus is available
+        if (typeof Stimulus === 'undefined') {
+          console.error('Stimulus JS not loaded. Falling back to vanilla JS implementation.');
+          vanillaJSImplementation();
+          return;
+        }
+
+        const application = Stimulus.Application.start();
+
+        application.register("countdown", class extends Stimulus.Controller {
+          static targets = ["timeDisplay", "secondsLeft", "progressRing", "startButton", "pauseButton", "resetButton"];
+          
+          connect() {
+            this.totalSeconds = 120;
+            this.remainingSeconds = this.totalSeconds;
+            this.isRunning = false;
+            this.circumference = 2 * Math.PI * 45; // 2πr where r=45
+            this.updateDisplay();
+          }
+          
+          start() {
+            if (!this.isRunning) {
+              this.isRunning = true;
+              this.toggleButtons(true);
+              
+              this.timer = setInterval(() => {
+                this.remainingSeconds -= 1;
+                this.updateDisplay();
+                
+                if (this.remainingSeconds <= 0) {
+                  this.stop();
+                }
+              }, 1000);
+            }
+          }
+          
+          pause() {
+            if (this.isRunning) {
+              clearInterval(this.timer);
+              this.isRunning = false;
+              this.toggleButtons(false);
+            }
+          }
+          
+          reset() {
+            this.pause();
+            this.remainingSeconds = this.totalSeconds;
+            this.updateDisplay();
+            this.startButtonTarget.disabled = false;
+            this.startButtonTarget.classList.remove("opacity-50");
+            this.pauseButtonTarget.disabled = true;
+            this.pauseButtonTarget.classList.add("opacity-50");
+            this.resetButtonTarget.disabled = true;
+            this.resetButtonTarget.classList.add("opacity-50");
+          }
+          
+          stop() {
+            clearInterval(this.timer);
+            this.isRunning = false;
+            this.toggleButtons(false);
+            // Visual indicator that time is up
+            this.timeDisplayTarget.classList.add("text-red-600");
+            setTimeout(() => {
+              this.timeDisplayTarget.classList.remove("text-red-600");
+            }, 1000);
+          }
+          
+          toggleButtons(isRunning) {
+            this.startButtonTarget.disabled = isRunning;
+            this.startButtonTarget.classList.toggle("opacity-50", isRunning);
+            
+            this.pauseButtonTarget.disabled = !isRunning;
+            this.pauseButtonTarget.classList.toggle("opacity-50", !isRunning);
+            
+            this.resetButtonTarget.disabled = this.remainingSeconds === this.totalSeconds;
+            this.resetButtonTarget.classList.toggle("opacity-50", this.remainingSeconds === this.totalSeconds);
+          }
+          
+          updateDisplay() {
+            // Update the digital time display
+            const minutes = Math.floor(this.remainingSeconds / 60);
+            const seconds = this.remainingSeconds % 60;
+            this.timeDisplayTarget.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            // Update the seconds text
+            this.secondsLeftTarget.textContent = `${this.remainingSeconds} seconds left`;
+            
+            // Update the progress ring
+            const progress = (this.totalSeconds - this.remainingSeconds) / this.totalSeconds;
+            const dashoffset = this.circumference * (1 - progress);
+            this.progressRingTarget.style.strokeDashoffset = dashoffset;
+            
+            // Enable or disable the reset button based on whether we're at the beginning
+            this.resetButtonTarget.disabled = this.remainingSeconds === this.totalSeconds && !this.isRunning;
+            this.resetButtonTarget.classList.toggle("opacity-50", this.remainingSeconds === this.totalSeconds && !this.isRunning);
+          }
+        });
+      });
+
+      // Fallback to vanilla JS if Stimulus fails to load
+      function vanillaJSImplementation() {
+        const timeDisplay = document.querySelector('[data-countdown-target="timeDisplay"]');
+        const secondsLeft = document.querySelector('[data-countdown-target="secondsLeft"]');
+        const progressRing = document.querySelector('[data-countdown-target="progressRing"]');
+        const startButton = document.querySelector('[data-countdown-target="startButton"]');
+        const pauseButton = document.querySelector('[data-countdown-target="pauseButton"]');
+        const resetButton = document.querySelector('[data-countdown-target="resetButton"]');
+
+        let totalSeconds = 120;
+        let remainingSeconds = totalSeconds;
+        let isRunning = false;
+        let timer;
+        const circumference = 2 * Math.PI * 45; // 2πr where r=45
+
+        // Update the display initially
+        updateDisplay();
+
+        // Add event listeners
+        startButton.addEventListener('click', start);
+        pauseButton.addEventListener('click', pause);
+        resetButton.addEventListener('click', reset);
+
+        function start() {
+          if (!isRunning) {
+            isRunning = true;
+            toggleButtons(true);
+            
+            timer = setInterval(() => {
+              remainingSeconds -= 1;
+              updateDisplay();
+              
+              if (remainingSeconds <= 0) {
+                stop();
+              }
+            }, 1000);
+          }
+        }
+        
+        function pause() {
+          if (isRunning) {
+            clearInterval(timer);
+            isRunning = false;
+            toggleButtons(false);
+          }
+        }
+        
+        function reset() {
+          pause();
+          remainingSeconds = totalSeconds;
+          updateDisplay();
+          startButton.disabled = false;
+          startButton.classList.remove("opacity-50");
+          pauseButton.disabled = true;
+          pauseButton.classList.add("opacity-50");
+          resetButton.disabled = true;
+          resetButton.classList.add("opacity-50");
+        }
+        
+        function stop() {
+          clearInterval(timer);
+          isRunning = false;
+          toggleButtons(false);
+          // Visual indicator that time is up
+          timeDisplay.classList.add("text-red-600");
+          setTimeout(() => {
+            timeDisplay.classList.remove("text-red-600");
+          }, 1000);
+        }
+        
+        function toggleButtons(running) {
+          startButton.disabled = running;
+          startButton.classList.toggle("opacity-50", running);
+          
+          pauseButton.disabled = !running;
+          pauseButton.classList.toggle("opacity-50", !running);
+          
+          resetButton.disabled = remainingSeconds === totalSeconds;
+          resetButton.classList.toggle("opacity-50", remainingSeconds === totalSeconds);
+        }
+        
+        function updateDisplay() {
+          // Update the digital time display
+          const minutes = Math.floor(remainingSeconds / 60);
+          const seconds = remainingSeconds % 60;
+          timeDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+          
+          // Update the seconds text
+          secondsLeft.textContent = `${remainingSeconds} seconds left`;
+          
+          // Update the progress ring
+          const progress = (totalSeconds - remainingSeconds) / totalSeconds;
+          const dashoffset = circumference * (1 - progress);
+          progressRing.style.strokeDashoffset = dashoffset;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
